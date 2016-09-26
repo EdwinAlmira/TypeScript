@@ -64,7 +64,7 @@ namespace ts {
          * A map that keeps track of aliases created for classes with decorators to avoid issues
          * with the double-binding behavior of classes.
          */
-        let classAliases: Map<Identifier>;
+        let classAliases: Map<number, Identifier>;
 
         /**
          * Keeps track of whether  we are within any containing namespaces when performing
@@ -706,7 +706,7 @@ namespace ts {
             if (resolver.getNodeCheckFlags(node) & NodeCheckFlags.ClassWithConstructorReference) {
                 enableSubstitutionForClassAliases();
                 classAlias = createUniqueName(node.name && !isGeneratedIdentifier(node.name) ? node.name.text : "default");
-                classAliases[getOriginalNodeId(node)] = classAlias;
+                classAliases.set(getOriginalNodeId(node), classAlias);
             }
 
             const declaredName = getDeclarationName(node, /*allowComments*/ true);
@@ -790,7 +790,7 @@ namespace ts {
                 if (resolver.getNodeCheckFlags(node) & NodeCheckFlags.ClassWithConstructorReference) {
                     // record an alias as the class name is not in scope for statics.
                     enableSubstitutionForClassAliases();
-                    classAliases[getOriginalNodeId(node)] = getSynthesizedClone(temp);
+                    classAliases.set(getOriginalNodeId(node), getSynthesizedClone(temp));
                 }
 
                 // To preserve the behavior of the old emitter, we explicitly indent
@@ -3245,7 +3245,7 @@ namespace ts {
                 context.enableSubstitution(SyntaxKind.Identifier);
 
                 // Keep track of class aliases.
-                classAliases = createMap<Identifier>();
+                classAliases = new NumberMap<number, Identifier>();
             }
         }
 
@@ -3379,7 +3379,7 @@ namespace ts {
                     // constructor references in static property initializers.
                     const declaration = resolver.getReferencedValueDeclaration(node);
                     if (declaration) {
-                        const classAlias = classAliases[declaration.id];
+                        const classAlias = classAliases.get(declaration.id);
                         if (classAlias) {
                             const clone = getSynthesizedClone(classAlias);
                             setSourceMapRange(clone, node);
