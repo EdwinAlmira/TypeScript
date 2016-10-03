@@ -19212,7 +19212,7 @@ namespace ts {
                     // Merge in UMD exports with first-in-wins semantics (see #9771)
                     const source = file.symbol.globalExports;
                     source.forEach((sourceSymbol, id) => {
-                        setIfNotSet(globals, id, () => sourceSymbol);
+                        setIfNotSet(globals, id, sourceSymbol);
                     });
                 }
                 if ((compilerOptions.isolatedModules || isExternalModule(file)) && !file.isDeclarationFile) {

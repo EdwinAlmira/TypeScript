@@ -671,7 +671,7 @@ namespace ts {
                 const specifiers = !exportEquals && exportSpecifiers && exportSpecifiers.get(name.text);
                 if (specifiers) {
                     const sourceFileId = getOriginalNodeId(currentSourceFile);
-                    const bindingNameExportSpecifiers = getOrUpdate2(bindingNameExportSpecifiersForFileMap, sourceFileId, () => new StringMap());
+                    const bindingNameExportSpecifiers = getOrUpdate(bindingNameExportSpecifiersForFileMap, sourceFileId, () => new StringMap());
                     bindingNameExportSpecifiers.set(name.text, exportSpecifiers.get(name.text));
                     addExportMemberAssignments(resultStatements, name);
                 }

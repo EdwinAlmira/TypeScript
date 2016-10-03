@@ -699,7 +699,7 @@ namespace FourSlash {
             const completions = this.getCompletionListAtCaret();
             const uniqueItems = new ts.StringMap<string>();
             for (const item of completions.entries) {
-                if (!ts.setIfNotSet(uniqueItems, item.name, () => item.kind)) {
+                if (!ts.setIfNotSet(uniqueItems, item.name, item.kind)) {
                     assert.equal(item.kind, uniqueItems.get(item.name), `Items should have the same kind, got ${item.kind} and ${uniqueItems.get(item.name)}`);
                 }
             }

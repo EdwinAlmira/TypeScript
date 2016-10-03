@@ -51,7 +51,7 @@ namespace ts {
         let currentNamespace: ModuleDeclaration;
         let currentNamespaceContainerName: Identifier;
         let currentScope: SourceFile | Block | ModuleBlock | CaseBlock;
-        let currentScopeFirstDeclarationsOfName: Map<Node>;
+        let currentScopeFirstDeclarationsOfName: Map<string, Node> | undefined;
         let currentSourceFileExternalHelpersModuleName: Identifier;
 
         /**
@@ -2713,12 +2713,10 @@ namespace ts {
             const name = node.symbol && node.symbol.name;
             if (name) {
                 if (!currentScopeFirstDeclarationsOfName) {
-                    currentScopeFirstDeclarationsOfName = createMap<Node>();
+                    currentScopeFirstDeclarationsOfName = new StringMap<Node>();
                 }
 
-                if (!(name in currentScopeFirstDeclarationsOfName)) {
-                    currentScopeFirstDeclarationsOfName[name] = node;
-                }
+                setIfNotSet(currentScopeFirstDeclarationsOfName, name, node);
             }
         }
 
@@ -2730,7 +2728,7 @@ namespace ts {
             if (currentScopeFirstDeclarationsOfName) {
                 const name = node.symbol && node.symbol.name;
                 if (name) {
-                    return currentScopeFirstDeclarationsOfName[name] === node;
+                    return currentScopeFirstDeclarationsOfName.get(name) === node;
                 }
             }
 

@@ -188,7 +188,7 @@ namespace ts {
         }
 
         function getWordSpans(word: string): TextSpan[] {
-            return getOrUpdate2(stringToWordSpans, word, breakIntoWordSpans);
+            return getOrUpdate(stringToWordSpans, word, breakIntoWordSpans);
         }
 
         function matchTextChunk(candidate: string, chunk: TextChunk, punctuationStripped: boolean): PatternMatch {

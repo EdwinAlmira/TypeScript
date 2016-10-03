@@ -1199,8 +1199,8 @@ namespace ts {
                 removeWildcardFilesWithLowerPriorityExtension(file, wildcardFileMap, supportedExtensions, keyMapper);
 
                 const key = keyMapper(file);
-                if (!literalFileMap.has(key)) {// && !wildcardFileMap.has(key)) {
-                    setIfNotSet(wildcardFileMap, key, () => file);
+                if (!literalFileMap.has(key)) {
+                    setIfNotSet(wildcardFileMap, key, file);
                 }
             }
         }

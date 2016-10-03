@@ -93,7 +93,7 @@ namespace Playback {
     function memoize<T>(func: (s: string) => T): Memoized<T> {
         const lookup = new ts.StringMap<T>();
         const run: Memoized<T> = <Memoized<T>>((s: string) =>
-            ts.getOrUpdateAndAllowUndefinedResult(lookup, s, func));
+            ts.getOrUpdateAndAllowUndefined(lookup, s, func));
         run.reset = () => {
             lookup.clear();
         };

@@ -111,7 +111,7 @@ namespace ts.server {
         describe("onMessage", () => {
             it("should not throw when commands are executed with invalid arguments", () => {
                 let i = 0;
-                eachOwnProperty(CommandNames, name => {
+                for (const name in CommandNames) {
                     const req: protocol.Request = {
                         command: name,
                         seq: i,

@@ -1,10 +1,23 @@
-//Map constructors: NumberMap and StringMap
-//also Set
+// NumberMap, StringMap, and StringSet shims
 /* @internal */
 namespace ts {
     // The global Map object. This may not be available, so we must test for it.
     declare const Map: NumberMapConstructor & StringMapConstructor | undefined;
     const usingNativeMaps = typeof Map !== "undefined";
+    // tslint:disable-next-line:no-in-operator
+    const fullyFeaturedMaps = usingNativeMaps && "keys" in Map.prototype && "values" in Map.prototype && "entries" in Map.prototype;
+
+    /** Extra Map methods that may not be available, so we must provide fallbacks. */
+    interface FullyFeaturedMap<K, V> extends Map<K, V> {
+        keys(): Iterator<K>;
+        values(): Iterator<V>;
+        entries(): Iterator<[K, V]>;
+    }
+
+    /** Simplified ES6 Iterator interface. */
+    interface Iterator<T> {
+        next(): { value: T, done: false } | { value: never, done: true };
+    }
 
     export interface NumberMapConstructor {
         /**
@@ -57,20 +70,6 @@ namespace ts {
         }
     };
 
-    /** Extra Map methods that may not be available, so we must provide fallbacks. */
-    interface FullyFeaturedMap<K, V> extends Map<K, V> {
-        keys(): Iterator<K>;
-        values(): Iterator<V>;
-        entries(): Iterator<[K, V]>;
-    }
-    /** Simplified ES6 Iterator interface. */
-    interface Iterator<T> {
-        next(): { value: T, done: false } | { value: never, done: true };
-    }
-
-    // tslint:disable-next-line:no-in-operator
-    const fullyFeaturedMaps = usingNativeMaps && "keys" in Map.prototype && "values" in Map.prototype && "entries" in Map.prototype;
-
     export interface StringMapConstructor {
         new<T>(): Map<string, T>;
     }
@@ -108,13 +107,6 @@ namespace ts {
         }
     };
 
-    //doc
-    export function createMapWithEntry<T>(key: string, value: T): Map<string, T> {
-        const map = new StringMap<T>();
-        map.set(key, value);
-        return map;
-    }
-
     const createObject = Object.create;
     function createDictionaryModeObject<T>(): MapLike<T> {
         const map = createObject(null); // tslint:disable-line:no-null-keyword
@@ -126,12 +118,6 @@ namespace ts {
         delete map["__"];
 
         return map;
-    }
-
-    /** Set a value in a map, then return that value. */
-    export function setAndReturn<K, V>(map: Map<K, V>, key: K, value: V): V {
-        map.set(key, value);
-        return value;
     }
 
     /** Iterates over entries in the map, returning the first output of `getResult` that is not `undefined`. */
@@ -224,25 +210,13 @@ namespace ts {
             return size;
         };
 
-    /** Return a new map with each key transformed by `getNewKey`. */
-    export function transformKeys<T>(map: Map<string, T>, getNewKey: (key: string) => string): Map<string, T> {
-        const newMap = new StringMap<T>();
+    /** Convert a Map to a MapLike. */
+    export function mapLikeOfMap<T>(map: Map<string, T>): MapLike<T> {
+        const obj = createDictionaryModeObject<T>();
         map.forEach((value, key) => {
-            newMap.set(getNewKey(key), value);
+            obj[key] = value;
         });
-        return newMap;
-    }
-
-    /** Replace each value with the result of calling `getNewValue`. */
-    export function updateMapValues<V>(map: Map<any, V>, getNewValue: (value: V) => V): void {
-        map.forEach((value, key) => {
-            map.set(key, getNewValue(value));
-        });
-    }
-
-    /** False if there are any entries in the map. */
-    export function mapIsEmpty(map: Map<any, any>): boolean {
-        return !someKeyInMap(map, () => true);
+        return obj;
     }
 
     /** Create a map from a MapLike. This is useful for writing large maps as object literals. */
@@ -256,18 +230,73 @@ namespace ts {
         return map;
     }
 
-    /** Convert a Map to a MapLike. */
-    export function mapLikeOfMap<T>(map: Map<string, T>): MapLike<T> {
-        const obj = createDictionaryModeObject<T>();
-        map.forEach((value, key) => {
-            obj[key] = value;
-        });
-        return obj;
+    class ShimStringSet implements Set<string> {
+        private data = createDictionaryModeObject<true>();
+
+        constructor() {}
+
+        add(value: string) {
+            this.data[value] = true;
+        }
+
+        clear() {
+            this.data = createDictionaryModeObject<true>();
+        }
+
+        delete(value: string) {
+            delete this.data[value];
+        }
+
+        forEach(action: (value: string) => void) {
+            for (const value in this.data) {
+                action(value);
+            }
+        }
+
+        has(value: string) {
+            // tslint:disable-next-line:no-in-operator
+            return value in this.data;
+        }
+
+        isEmpty() {
+            // tslint:disable-next-line:no-unused-variable
+            for (const _ in this.data) {
+                return false;
+            }
+            return true;
+        }
     }
 
-    /** Replace the value at `key` with a new one. */
-    export function modifyValue<K, V>(map: Map<K, V>, key: K, getNewValue: (value: V) => V) {
-        map.set(key, getNewValue(map.get(key)));
+    declare const Set: { new(): Set<string> } | undefined;
+    const usingNativeSets = typeof Set !== "undefined";
+
+    /** In runtimes without Sets, this is implemented using an object. */
+    export const StringSet: { new(): Set<string> } = usingNativeSets ? Set : ShimStringSet;
+
+    /** False if there are any values in the set. */
+    export const setIsEmpty: (set: Set<string>) => boolean = usingNativeSets
+        ? set => (set as any).size === 0
+        : (set: ShimStringSet) => set.isEmpty();
+}
+
+// Map utilities
+namespace ts {
+    /** Create a map containing a single entry key -> value. */
+    export function createMapWithEntry<T>(key: string, value: T): Map<string, T> {
+        const map = new StringMap<T>();
+        map.set(key, value);
+        return map;
+    }
+
+    /** Set a value in a map, then return that value. */
+    export function setAndReturn<K, V>(map: Map<K, V>, key: K, value: V): V {
+        map.set(key, value);
+        return value;
+    }
+
+    /** False if there are any entries in the map. */
+    export function mapIsEmpty(map: Map<any, any>): boolean {
+        return !someKeyInMap(map, () => true);
     }
 
     /** Create a new copy of a Map. */
@@ -303,32 +332,59 @@ namespace ts {
         return values;
     }
 
-    /** Get a value in the map, or if not already present, set and return it. */
-    //name
-    export function getOrUpdateAndAllowUndefinedResult<K, V>(map: Map<K, V>, key: K, getValue: (key: K) => V): V {
-        //want to use map.get(key) then check for undefined.
-        return map.has(key) ? map.get(key) : setAndReturn(map, key, getValue(key));
+    /** Return a new map with each key transformed by `getNewKey`. */
+    export function transformKeys<T>(map: Map<string, T>, getNewKey: (key: string) => string): Map<string, T> {
+        const newMap = new StringMap<T>();
+        map.forEach((value, key) => {
+            newMap.set(getNewKey(key), value);
+        });
+        return newMap;
     }
 
-    //neater
-    export function getOrUpdate2<K, V>(map: Map<K, V>, key: K, getValue: (key: K) => V): V {
+    /** Replace each value with the result of calling `getNewValue`. */
+    export function updateMapValues<V>(map: Map<any, V>, getNewValue: (value: V) => V): void {
+        map.forEach((value, key) => {
+            map.set(key, getNewValue(value));
+        });
+    }
+
+    /**
+     * Change the value at `key` by applying the given function to it.
+     * If there is no value at `key` then `getNewValue` will be passed `undefined`.
+     */
+    export function modifyValue<K, V>(map: Map<K, V>, key: K, getNewValue: (value: V) => V) {
+        map.set(key, getNewValue(map.get(key)));
+    }
+
+    /**
+     * Get a value in the map, or if not already present, set and return it.
+     * Treats entries set to `undefined` as equivalent to not being set (saving a call to `has`).
+     */
+    export function getOrUpdate<K, V>(map: Map<K, V>, key: K, getValue: (key: K) => V): V {
         const value = map.get(key);
         return value !== undefined ? value : setAndReturn(map, key, getValue(key));
     }
 
-    //review
-    //maybe we should pass in value instead of getValue, thus no closure
-    //returns whether it was set
-    export function setIfNotSet<K, V>(map: Map<K, V>, key: K, getValue: (key: K) => V): boolean {
+    /** Like `getOrUpdate`, but recognizes `undefined` as having been already set. */
+    export function getOrUpdateAndAllowUndefined<K, V>(map: Map<K, V>, key: K, getValue: (key: K) => V): V {
+        return map.has(key) ? map.get(key) : setAndReturn(map, key, getValue(key));
+    }
+
+    /**
+     * Sets the the value if the key is not already in the map.
+     * Returns whether the value was set.
+     */
+    export function setIfNotSet<K, V>(map: Map<K, V>, key: K, value: V): boolean {
         const shouldSet = !map.has(key);
         if (shouldSet) {
-            map.set(key, getValue(key));
+            map.set(key, value);
         }
         return shouldSet;
     }
 
+    /** Deletes an entry from a map and returns it; or returns undefined if the key was not in the map. */
     export function tryDelete<K, V>(map: Map<K, V>, key: K): V | undefined {
-        const current = map.get(key)
+        const current = map.get(key);
         if (current !== undefined) {
             map.delete(key);
             return current;
@@ -402,70 +458,31 @@ namespace ts {
         return !someInRightHasNoMatch;
     }
 
-    //document
+    /**
+     * Creates a sorted array of keys.
+     * Sorts keys according to the iteration order they would have if they were in an object, instead of from a Map.
+     * This is so that tests run consistently whether or not we have a Map shim in place.
+     * The difference between Map iteration order and V8 object insertion order is that V8 moves natrual-number-like keys to the front.
+     */
     export function sortInV8ObjectInsertionOrder<T>(values: T[], toKey: (t: T) => string): T[] {
-        const naturals: T[] = []; //name
-        const everythingElse: T[] = [];
+        const naturalNumberKeys: T[] = [];
+        const allOtherKeys: T[] = [];
         for (const value of values) {
             // "0" looks like a natural but "08" doesn't.
             const looksLikeNatural = /^(0|([1-9]\d*))$/.test(toKey(value));
-            (looksLikeNatural ? naturals : everythingElse).push(value);
+            (looksLikeNatural ? naturalNumberKeys : allOtherKeys).push(value);
         }
         function toInt(value: T): number {
             return parseInt(toKey(value), 10);
         }
-        naturals.sort((a, b) => toInt(a) - toInt(b));
-        return naturals.concat(everythingElse);
+        naturalNumberKeys.sort((a, b) => toInt(a) - toInt(b));
+        return naturalNumberKeys.concat(allOtherKeys);
     }
+}
 
-
-    class ShimStringSet implements Set<string> {
-        private data = createDictionaryModeObject<true>();
-
-        constructor() {}
-
-        add(value: string) {
-            this.data[value] = true;
-        }
-
-        clear() {
-            this.data = createDictionaryModeObject<true>();
-        }
-
-        delete(value: string) {
-            delete this.data[value];
-        }
-
-        forEach(action: (value: string) => void) {
-            for (const value in this.data) {
-                action(value);
-            }
-        }
-
-        has(value: string) {
-            return value in this.data;
-        }
-
-        isEmpty() {
-            // tslint:disable-next-line:no-unused-variable
-            for (const _ in this.data) {
-                return false;
-            }
-            return true;
-        }
-    }
-
-    declare const Set: { new(): Set<string> } | undefined;
-    const usingNativeSets = typeof Set !== "undefined";
-
-    /** In runtimes without Sets, this is implemented using an object. */
-    export const StringSet: { new(): Set<string> } = usingNativeSets ? Set : ShimStringSet;
-
-    /** False if there are any values in the set. */
-    export const setIsEmpty: (set: Set<string>) => boolean = usingNativeSets
-        ? set => (set as any).size === 0
-        : (set: ShimStringSet) => set.isEmpty();
-
+// Set utilities
+/* @internal */
+namespace ts {
     /** Union of the `getSet` of each element in the array. */
     export function setAggregate<T>(array: T[], getSet: (t: T) => Set<string>): Set<string> {
         const result = new StringSet();
@@ -492,10 +509,10 @@ namespace ts {
     }
 }
 
-//MAPLIKE
+// MapLike utilities
 /* @internal */
 namespace ts {
-    const hasOwnProperty = Object.prototype.hasOwnProperty; //neater
+    const hasOwnProperty = Object.prototype.hasOwnProperty;
 
     export function clone<T>(object: T): T {
         const result: any = {};
@@ -518,15 +535,6 @@ namespace ts {
      */
     export function hasProperty<T>(map: MapLike<T>, key: string): boolean {
         return hasOwnProperty.call(map, key);
-    }
-
-    //todo: use this to replace more for-in loops
-    export function eachOwnProperty(object: any, useKey: (key: string) => void) {
-        for (const key in object) {
-            if (hasProperty(object, key)) {
-                useKey(key);
-            }
-        }
     }
 
     /**
